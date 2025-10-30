@@ -111,6 +111,22 @@ struct LinearTransform : VectorTransform {
     ~LinearTransform() override {}
 };
 
+struct LinearCombination : LinearTransform {
+    int d_dense;
+    int d_sparse;
+
+    float w_dense;
+    float w_sparse;
+
+    explicit LinearCombination(
+        int d_dense = 0,
+        int d_sparse = 0,
+        float w_dense = 1.0f, 
+        float w_sparse = 1.0f);
+    
+    void train(idx_t n, const float* x) override;
+};
+
 /// Randomly rotate a set of vectors
 struct RandomRotationMatrix : LinearTransform {
     /// both d_in > d_out and d_out < d_in are supported

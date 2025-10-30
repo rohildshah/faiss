@@ -318,6 +318,31 @@ void LinearTransform::check_identical(const VectorTransform& other_in) const {
     FAISS_THROW_IF_NOT(other->A == A && other->b == b);
 }
 
+LinearCombination::LinearCombination(int d_dense, int d_sparse, float w_dense, float w_sparse) 
+    : LinearTransform(d_dense + (2 * d_sparse), d_dense + (2 * d_sparse), false),
+      d_dense(d_dense),
+      d_sparse(d_sparse) {
+    FAISS_ASSERT(w_dense >= 0.0f && w_sparse >= 0.0f);
+
+    this->w_dense = sqrt(w_dense);
+    this->w_sparse = sqrt(w_sparse);
+}
+    
+void LinearCombination::train(idx_t n, const float* x) {
+    A.resize(d_in * d_in);
+    for (int i = 0; i < d_in; i++) {
+        if (i < d_dense) {
+            A[i * d_in + i] = w_dense;
+        } else if (i < d_dense + d_sparse) {
+            A[i * d_in + i] = 1.0f;
+        } else {
+            A[i * d_in + i] = w_sparse;
+        }
+    }
+
+    is_trained = true;
+}
+
 /*********************************************
  * RandomRotationMatrix
  *********************************************/

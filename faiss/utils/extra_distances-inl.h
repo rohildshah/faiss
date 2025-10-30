@@ -163,6 +163,76 @@ inline float VectorDistance<METRIC_ABS_INNER_PRODUCT>::operator()(
     return accu;
 }
 
+template <>
+inline float VectorDistance<METRIC_HYBRID_INNER_PRODUCT>::operator()(
+        const float* x,
+        const float* y) const {
+    
+    const size_t d_dense = static_cast<size_t>(metric_arg);
+    const size_t d_sparse = (d - d_dense) / 2;
+
+    const float w_dense = 2 * (metric_arg - d_dense);
+    const float w_sparse = 1 - w_dense;
+
+    // printf("w_dense: %f, w_sparse: %f\n", w_dense, w_sparse);
+
+    float dense_score = 0.0;
+    float sparse_score = 0.0;
+    
+    if (w_dense > 1e-6) {
+        dense_score = fvec_inner_product(x, y, d_dense);
+    }
+    
+    if (w_sparse > 1e-6) {
+        size_t x_ptr = d_dense;
+        size_t y_ptr = d_dense;
+
+        while (x_ptr < d_dense + d_sparse && y_ptr < d_dense + d_sparse) {
+            float x_idx = x[x_ptr];
+            float y_idx = y[y_ptr];
+
+            float x_val = x[x_ptr + d_sparse];
+            float y_val = y[y_ptr + d_sparse];
+
+            if (x_idx == y_idx) {
+                sparse_score += x_val * y_val;
+                x_ptr++;
+                y_ptr++;
+            } else if (x_idx < y_idx) {
+                x_ptr++;
+            } else {
+                y_ptr++;
+            }
+        }
+
+        // float x_len = 0;
+        // float y_len = 0;
+
+        // for (size_t i = 0; i < d_sparse; i++) {
+        //     int idx = i + d_dense + d_sparse;
+
+        //     // L1
+        //     x_len += x[idx];
+        //     y_len += y[idx];
+
+        //     // L2
+        //     x_len += x[idx] * x[idx];
+        //     y_len += y[idx] * y[idx];
+        // }
+
+        // // L1
+        // sparse_score /= (x_len * y_len);
+
+        // // L2
+        // sparse_score /= sqrt(x_len * y_len);
+
+        // Log normalization
+        sparse_score = log(1 + sparse_score) / 4;
+    }
+
+    return w_dense * dense_score + w_sparse * sparse_score;
+}
+
 /***************************************************************************
  * Dispatching function that takes a metric type and a consumer object
  * the consumer object should contain a retun type T and a operation template
@@ -194,6 +264,7 @@ typename Consumer::T dispatch_VectorDistance(
         DISPATCH_VD(METRIC_Jaccard);
         DISPATCH_VD(METRIC_NaNEuclidean);
         DISPATCH_VD(METRIC_ABS_INNER_PRODUCT);
+        DISPATCH_VD(METRIC_HYBRID_INNER_PRODUCT);
         default:
             FAISS_THROW_FMT("Invalid metric %d", metric);
     }
